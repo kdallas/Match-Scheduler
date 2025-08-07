@@ -21,19 +21,23 @@ $$
 $$
 
 >Each player can only be in max 1 match at a time
+
 $$
 \forall p, \sum_{m \ni p}{x_m \le 1 }
 $$
 
 >Limit maximum number of games by number of courts (C)
+
 $$
 \sum_{m \in M}{x_m \le C}
 $$
 
 >Forbid repeat matches
+
 $$x_m = 0$$
 
 >Prioritise players that didn't play the previous round and players that have the lowest number of games played. This is done by assigning a priority score for each player based on number of played games (n) and the total number of rounds played so far (R).
+
 $$
 priority(p) = \begin{cases}
     1               & \text{If p not played in previous round}  \\
@@ -42,8 +46,10 @@ priority(p) = \begin{cases}
 $$
 
 >The algorithm has the objective of maximising the total priority score in all the matches being played in a round.
+
 $$
-\max \left( \sum_{m \in M} \left( \sum_{p \in m} \text{priority}(p) \right) \cdot x_m \right) $$
+\max \left( \sum_{m \in M} \left( \sum_{p \in m} \text{priority}(p) \right) \cdot x_m \right) 
+$$
 
 # How to Run
 - Ensure python is installed.
