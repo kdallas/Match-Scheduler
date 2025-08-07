@@ -1,0 +1,22 @@
+# Config for the round robin generator
+
+SCORE_DIFF_LIMIT: 10
+
+NUM_COURTS: 5
+
+SKILL_SCORES:
+  red: 100
+  red-black: 90
+  black: 80
+  black-blue: 70
+  blue: 60
+  blue-green: 50
+  green: 40
+
+FEMALE_SCORE_MODIFIER: -10
+
+TEMPERATURE: 0
+
+MAX_TIME: null
+
+# DEBUG: True
