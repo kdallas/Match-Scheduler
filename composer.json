@@ -1,7 +1,11 @@
 {
-    "require": {
-        "symfony/yaml": "^7.3",
-        "drupol/phpermutations": "^1.4",
-        "phplucidframe/console-table": "^1.4"
-    }
+  "repositories": [{
+    "type": "vcs",
+    "url": "https://github.com/yemilgr/phpermutations"
+  }],
+  "require": {
+    "symfony/yaml": "^7.3",
+    "drupol/phpermutations": "dev-master",
+    "phplucidframe/console-table": "^1.4"
+  }
 }
