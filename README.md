@@ -51,8 +51,8 @@ $$
 $$
 
 # How to Run
-- Ensure CLI PHP and Composer is installed.
-- Install the dependencies with Composer:
+- Ensure command line PHP (v8.4 recommended) and Composer is installed.
+- Install the library dependencies with Composer:
 
 ```
 composer install
@@ -66,6 +66,6 @@ composer install
 php run.php
 ```
 
-- Use options to continously generate matches while avoiding repeats
+- Use options to continuously generate matches while avoiding repeats
 - Keep running stats of how many games each player has played
 - Save a log of the matches played
