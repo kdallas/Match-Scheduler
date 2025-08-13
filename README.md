@@ -3,7 +3,7 @@ Based on Python-based "Round Robin match generator".  PHP version for 2v2 badmin
 
 # Explanation
 ## Why
-Generating round robin pairings becomes an increasingly complicated challenge the more constraints are considered. The main factors are player skill level, and time players have been spent waiting. To account for these factors, Integer Programming is used to find solutions given these contraints. The CP-SAT solver from Google's OR-Tools suite is used as its an efficient and open source library.
+Generating round robin pairings becomes an increasingly complicated challenge the more constraints are considered. The main factors are player skill level, and time players have been spent waiting. To account for these factors, Integer Programming is used to find solutions given these contraints. ~~The CP-SAT solver from Google's OR-Tools suite is used as its an efficient and open source library.~~
 
 ## Contraints
 Every player is given a skill score based on their peg colour and gender. A Match is only considered valid if the difference in the sum of skill scores on both sides of the court is less than a specified limit. This ensures only balanced matches. 
@@ -51,19 +51,19 @@ $$
 $$
 
 # How to Run
-- Ensure python is installed.
-- Install the requirements into your environment of choice. 
+- Ensure CLI PHP and Composer is installed.
+- Install the dependencies with Composer:
 
 ```
-pip install -r requirements.txt
+composer install
 ```
 
 - Set options in config.yml
 - Load player data into players2024.csv
-- Start the program
+- Start the program:
 
 ```
-python roundRobin.py
+php run.php
 ```
 
 - Use options to continously generate matches while avoiding repeats
