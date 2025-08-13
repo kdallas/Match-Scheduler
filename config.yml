@@ -1,6 +1,7 @@
 # Config for the round robin generator
 
-SCORE_DIFF_LIMIT: 10
+TEAM_DIFF_LIMIT: 10
+PARTNER_DIFF_LIMIT: 20
 
 NUM_COURTS: 5
 
@@ -13,7 +14,7 @@ SKILL_SCORES:
   blue-green: 50
   green: 40
 
-FEMALE_SCORE_MODIFIER: -10
+GENDER_SCORE_MODIFIER: -10
 
 TEMPERATURE: 0
 
