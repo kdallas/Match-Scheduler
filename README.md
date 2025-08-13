@@ -1,6 +1,5 @@
-# Badminton-Round-Robin
-Round Robin match generator for 2v2 badminton matches accounting for skill differences and aiming for equal number of games played.
-
+# 4-player (Doubles) Match Scheduler
+Based on Python-based "Round Robin match generator".  PHP version for 2v2 badminton matches accounting for skill differences and aiming for equal number of games played.
 
 # Explanation
 ## Why
