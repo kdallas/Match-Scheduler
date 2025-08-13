@@ -67,7 +67,7 @@ class RoundRobin
 
     private function loadPlayerData(): void
     {
-        if (($handle = fopen("players2024_r1.csv", "r")) !== FALSE) {
+        if (($handle = fopen("players2024.csv", "r")) !== FALSE) {
             $headers = fgetcsv($handle, 1000, ',', '"', '');
             while (($data = fgetcsv($handle, 1000, ',', '"', '')) !== FALSE) {
                 // This check handles potential errors where a row might not have the same number of columns as headers.
