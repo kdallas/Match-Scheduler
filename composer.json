@@ -1,0 +1,7 @@
+{
+    "require": {
+        "symfony/yaml": "^7.3",
+        "drupol/phpermutations": "^1.4",
+        "phplucidframe/console-table": "^1.4"
+    }
+}
