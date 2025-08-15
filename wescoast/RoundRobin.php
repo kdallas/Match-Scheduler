@@ -13,6 +13,8 @@ class RoundRobin
 {
     public array $playerData = [];
     public array $partners = [];
+    public array $allValidMatches = [];
+    public array $playedMatches = [];
 
     public static int $teamDiffLimit;
     public static int $partnerDiffLimit;
@@ -83,7 +85,6 @@ class RoundRobin
     {
         $loops = 0;
         $gamesGenCount = 1;
-        $playedMatches = []; // Store sorted lists of players to represent a unique match
         $matchLog = []; // Log for saving
 
         while (true) {
@@ -108,7 +109,7 @@ class RoundRobin
 
                 case '2':
                     echo PHP_EOL."Saving match history to JSON...".PHP_EOL;
-                    $this->saveMatches($this->playerData, $matchLog, "logs.json");
+                    $this->saveMatches($matchLog, "logs.json");
                     break;
 
                 case '3':
@@ -116,14 +117,13 @@ class RoundRobin
                     return;
 
                 default:
-                    $matches = $this->scheduleRound($this->playerData, self::$numCourts, $playedMatches);
-
+                    $matches = $this->scheduleRound();
                     $matchLog[] = $matches;
 
                     // Update games_played count and played_matches history
                     foreach ($matches as $match) {
-                        sort($match); // Sort to ensure consistent representation
-                        $playedMatches[] = $match;
+                        $this->playedMatches[] = $match;
+
                         foreach ($match as $playerName) {
                             // Find player in playerData and increment their game count
                             foreach ($this->playerData as &$p) {
@@ -136,7 +136,7 @@ class RoundRobin
                         }
                     }
 
-                    $this->printMatches($this->playerData, $matches);
+                    $this->printMatches($matches);
 
                     $gamesGenCount++;
                     break;
@@ -160,15 +160,15 @@ class RoundRobin
         return $score;
     }
 
-    public function generateValidMatches(array $players): array
+    public function generateValidMatches(): array
     {
-        $validMatches = [];
-
         if (!count($this->partners)) {
-            $playerPool = array_map(fn($p) => ['name' => $p['peg_name'], 'score' => $p['skill_score']], $players);
+            $playerPool = array_map(fn($p) => ['name' => $p['peg_name'], 'score' => $p['skill_score']], $this->playerData);
             $teams = new ComboGenerator($playerPool, 2);
             $this->partners = $teams->toArray();
         }
+
+        $validMatches = [];
 
         foreach ($this->partners as $team1) {
             $team1_names = array_column($team1, 'name');
@@ -192,36 +192,49 @@ class RoundRobin
                 $tScore2 = $team2[0]['score'] + $team2[1]['score'];
 
                 if (abs($tScore1 - $tScore2) <= self::$teamDiffLimit) {
-                    $match = array_merge($team1_names, $team2_names);
-                    sort($match); // Sort to make duplicate matches identical
-                    $validMatches[] = $match;
+
+                    $t1Hash = md5(print_r($team1_names,true));
+                    $t2Hash = md5(print_r($team2_names,true));
+
+                    $hashMash = [$t1Hash, $t2Hash];
+                    sort($hashMash);
+                    $hashMashStr = implode(":", $hashMash);
+
+                    $validMatches[$hashMashStr] = array_merge($team1_names, $team2_names);
                 }
             }
         }
 
         // Return unique matches
-        return array_values(array_unique($validMatches, SORT_REGULAR));
+        return $validMatches;
     }
 
-    public function scheduleRound(array $playerData, int $courts, array $playedMatches): array
+    public function scheduleRound(): array
     {
-        echo PHP_EOL."Generating valid matches...".PHP_EOL;
-        $allValidMatches = $this->generateValidMatches($playerData);
+        if (!count($this->allValidMatches)) {
+            echo PHP_EOL."Generating valid matches...".PHP_EOL;
+            $this->allValidMatches = $this->generateValidMatches();
+            $this->allValidMatches = $this->shuffleAssoc($this->allValidMatches);
+        }
+
+        if (count($this->playedMatches) == count($this->allValidMatches)) {
+            echo PHP_EOL."All matches played, resetting to zero...";
+            $this->playedMatches = [];
+        }
 
         // Filter out matches that have already been played
-        $unplayedMatches = array_filter($allValidMatches, function($match) use ($playedMatches) {
-            sort($match); // Ensure consistent order for checking
+        $playedMatches = $this->playedMatches;
+        $unplayedMatches = array_filter($this->allValidMatches, function($match) use ($playedMatches) {
             return !in_array($match, $playedMatches);
-        });
+        }, ARRAY_FILTER_USE_BOTH);
 
+        echo PHP_EOL.'count of allValidMatches: '.count($this->allValidMatches).PHP_EOL;
         echo 'count of unplayedMatches: '.count($unplayedMatches).PHP_EOL;
-        echo 'count of playedMatches: '.count($playedMatches).PHP_EOL;
+        echo 'count of playedMatches: '.count($this->playedMatches).PHP_EOL;
 
-        // --- REPLACEMENT FOR SHUFFLE ---
         // Create a quick lookup map of player names to their games_played count.
-        $gamesPlayedMap = array_column($playerData, 'games_played', 'peg_name');
+        $gamesPlayedMap = array_column($this->playerData, 'games_played', 'peg_name');
 
-        // Sort the unplayed matches instead of shuffling them.
         // Matches with a lower sum of games_played among their players will have higher priority (come first).
         usort($unplayedMatches, function ($matchA, $matchB) use ($gamesPlayedMap) {
             $scoreA = 0;
@@ -238,13 +251,12 @@ class RoundRobin
             // A lower score (fewer games played) will result in a negative value, placing it earlier in the sorted array.
             return $scoreA <=> $scoreB;
         });
-        // --- END REPLACEMENT ---
 
         $chosenMatches = [];
         $playersInThisRound = [];
-        foreach ($unplayedMatches as $match) {
+        foreach ($unplayedMatches as $key => $match) {
             // Stop if we have enough matches for the courts
-            if (count($chosenMatches) >= $courts) {
+            if (count($chosenMatches) >= self::$numCourts) {
                 break;
             }
 
@@ -254,14 +266,14 @@ class RoundRobin
             }
 
             // If the match is valid, add it and the players to our lists
-            $chosenMatches[] = $match;
+            $chosenMatches[$key] = $match;
             $playersInThisRound = array_merge($playersInThisRound, $match);
         }
 
         return $chosenMatches;
     }
 
-    public function printMatches(array $playerData, array $matches): void
+    public function printMatches(array $matches): void
     {
         if (empty($matches)) {
             echo PHP_EOL."No valid new matches could be generated for this round.".PHP_EOL;
@@ -269,16 +281,18 @@ class RoundRobin
         }
 
         $table = new ConsoleTable;
-        $table
-            ->setHeaders(["Court", "\u{2192} T1 Player1", "\u{2192} T1 Player2", '  ', "\u{2192} T2 Player1", "\u{2192} T2 Player2"])
-            ->hideBorder();
+        $table ->setHeaders(["Court", "\u{2192} T1 Player1", "\u{2192} T1 Player2", '  ', "\u{2192} T2 Player1", "\u{2192} T2 Player2"])
+               ->hideBorder();
 
-//        $playerScores = array_column($playerData, 'skill_score', 'peg_name');
-        $playerColours = array_column($playerData, 'peg_colour', 'peg_name');
-        $playerGenders = array_column($playerData, 'gender', 'peg_name');
+        $playerColours = array_column($this->playerData, 'peg_colour', 'peg_name');
+        $playerGenders = array_column($this->playerData, 'gender', 'peg_name');
 
-        foreach ($matches as $i => $match) {
+        $i=0;
+        $playerNames = [];
+
+        foreach ($matches as $match) {
             [$p1, $p2, $p3, $p4] = $match;
+            $playerNames[] = [$p1, $p2, $p3, $p4];
 
             $p1G = strtolower($playerGenders[$p1]) == 'f' ? "\u{2640}" : "\u{2642}";
             $p2G = strtolower($playerGenders[$p2]) == 'f' ? "\u{2640}" : "\u{2642}";
@@ -291,13 +305,14 @@ class RoundRobin
             $team2_p4_info = "$p4G $p4 ($playerColours[$p4])";
 
             $table->addRow([($i + 1), $team1_p1_info, $team1_p2_info, 'vs', $team2_p3_info, $team2_p4_info]);
+            $i++;
         }
 
         echo PHP_EOL;
         $table->display();
 
-        $allPlayerNames = array_column($playerData, 'peg_name');
-        $playingPlayerNames = array_merge(...$matches);
+        $allPlayerNames = array_column($this->playerData, 'peg_name');
+        $playingPlayerNames = array_merge(...$playerNames);
         $sittingOut = array_diff($allPlayerNames, $playingPlayerNames);
 
         if (!empty($sittingOut)) {
@@ -306,10 +321,10 @@ class RoundRobin
         }
     }
 
-    public function saveMatches(array $playerData, array $matchLog, string $outputFile): void
+    public function saveMatches(array $matchLog, string $outputFile): void
     {
         $log = [];
-        $allPlayerNames = array_column($playerData, 'peg_name');
+        $allPlayerNames = array_column($this->playerData, 'peg_name');
 
         $round = ['matches' => [], 'waiting' => []];
 
@@ -326,5 +341,28 @@ class RoundRobin
 
         file_put_contents($outputFile, json_encode($log, JSON_PRETTY_PRINT));
         echo "Matches saved to $outputFile".PHP_EOL;
+    }
+
+    public function shuffleAssoc($list)
+    {
+        if (!is_array($list)) {
+            return $list;
+        }
+
+        $keys = [];
+        $origKeys = array_keys($list);
+        shuffle($origKeys);
+
+        foreach ($origKeys as $key) {
+            $keys[] = strrev($key);
+        }
+        shuffle($keys);
+
+        $random = [];
+        foreach ($keys as $key) {
+            $key = strrev($key);
+            $random[$key] = $list[$key];
+        }
+        return $random;
     }
 }
