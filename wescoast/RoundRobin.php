@@ -205,8 +205,8 @@ class RoundRobin
             }
         }
 
-        // Return unique matches
-        return $validMatches;
+        // Return unique matches and give them a good shuffle whilst we're at it...
+        return $this->shuffleAssoc($validMatches);
     }
 
     public function scheduleRound(): array
@@ -214,7 +214,6 @@ class RoundRobin
         if (!count($this->allValidMatches)) {
             echo PHP_EOL."Generating valid matches...".PHP_EOL;
             $this->allValidMatches = $this->generateValidMatches();
-            $this->allValidMatches = $this->shuffleAssoc($this->allValidMatches);
         }
 
         if (count($this->playedMatches) == count($this->allValidMatches)) {
