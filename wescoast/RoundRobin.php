@@ -11,27 +11,26 @@ use LucidFrame\Console\ConsoleTable;
 
 class RoundRobin
 {
-    public array $playerData = [];
-    public array $partners = [];
-    public array $allValidMatches = [];
-    public array $playedMatches = [];
+    protected array $playerData = [];
+    protected array $partners = [];
+    protected array $allValidMatches = [];
+    protected array $playedMatches = [];
 
-    public static int $teamDiffLimit;
-    public static int $partnerDiffLimit;
-    public static int $numCourts;
-    public static array $skillRanks;
-    public static int $genderRankMod;
-    public static int $temperatureMod;
+    protected static array $skillRanks;
+    protected static int $teamDiffLimit;
+    protected static int $partnerDiffLimit;
+    protected static int $numCourts;
+    protected static int $genderRankMod;
+    protected static int $temperatureMod;
 
     public function __construct()
     {
         $this->loadConfiguration();
         $this->loadPlayerData();
         $this->initPlayerData(); // may need to be optional if we don't want to lose all games played -- but for now suitable for single runs of the script
-        $this->execMenu();
     }
 
-    private function loadConfiguration(): void
+    protected function loadConfiguration(): void
     {
         $config = Yaml::parseFile('config.yml');
 
@@ -59,15 +58,7 @@ class RoundRobin
         }
     }
 
-    private function initPlayerData(): void
-    {
-        foreach ($this->playerData as &$player) { // Use reference to modify in place
-            $player['games_played'] = 0;
-            $player['skill_score'] = $this->playerScore($player['peg_colour'], $player['gender']);
-        }
-    }
-
-    private function loadPlayerData(): void
+    protected function loadPlayerData(): void
     {
         if (($handle = fopen("players2024.csv", "r")) !== FALSE) {
             $headers = fgetcsv($handle, 1000, ',', '"', '');
@@ -81,7 +72,87 @@ class RoundRobin
         }
     }
 
-    private function execMenu(): void
+    protected function initPlayerData(): void
+    {
+        foreach ($this->playerData as &$player) { // Use reference to modify in place
+            $player['games_played'] = 0;
+            $player['skill_score'] = $this->playerScore($player['peg_colour'], $player['gender']);
+        }
+    }
+
+    protected function generateValidMatches(): array
+    {
+        if (!count($this->partners)) {
+            $playerPool = array_map(fn($p) => ['name' => $p['peg_name'], 'score' => $p['skill_score']], $this->playerData);
+            $teams = new ComboGenerator($playerPool, 2);
+            $this->partners = $teams->toArray();
+        }
+
+        $validMatches = [];
+
+        foreach ($this->partners as $team1) {
+            $team1_names = array_column($team1, 'name');
+
+            foreach ($this->partners as $team2) {
+
+                // Ensure no player is on both teams
+                $team2_names = array_column($team2, 'name');
+                if (array_intersect($team1_names, $team2_names)) {
+                    continue;
+                }
+
+                // this accounts for the score difference of 2 teams... e.g. 40 & 70 vs 60 & 60  or  40 & 100 vs 30 & 100,
+                // but we should also check for a greater score difference between partners too
+                if (abs($team1[0]['score'] - $team1[1]['score']) > self::$partnerDiffLimit ||
+                    abs($team2[0]['score'] - $team2[1]['score']) > self::$partnerDiffLimit) {
+                    continue;
+                }
+
+                $tScore1 = $team1[0]['score'] + $team1[1]['score'];
+                $tScore2 = $team2[0]['score'] + $team2[1]['score'];
+
+                if (abs($tScore1 - $tScore2) <= self::$teamDiffLimit) {
+
+                    $t1Hash = md5(print_r($team1_names,true));
+                    $t2Hash = md5(print_r($team2_names,true));
+
+                    $hashMash = [$t1Hash, $t2Hash];
+                    sort($hashMash);
+                    $hashMashStr = implode(":", $hashMash);
+
+                    $validMatches[$hashMashStr] = array_merge($team1_names, $team2_names);
+                }
+            }
+        }
+
+        // Return unique matches and give them a good shuffle whilst we're at it...
+        return $this->shuffleAssoc($validMatches);
+    }
+
+    protected function shuffleAssoc($list)
+    {
+        if (!is_array($list)) {
+            return $list;
+        }
+
+        $keys = [];
+        $origKeys = array_keys($list);
+        shuffle($origKeys);
+
+        foreach ($origKeys as $key) {
+            $keys[] = strrev($key);
+        }
+        shuffle($keys);
+
+        $random = [];
+        foreach ($keys as $key) {
+            $key = strrev($key);
+            $random[$key] = $list[$key];
+        }
+        return $random;
+    }
+
+    public function execMenu(): void
     {
         $loops = 0;
         $gamesGenCount = 1;
@@ -144,69 +215,6 @@ class RoundRobin
 
             $loops++;
         }
-    }
-
-    public function playerScore(string $colour, string $gender): int
-    {
-        $score = self::$skillRanks[$colour] ?? 0;
-        if (strtolower($gender) === 'f') {
-            $score += self::$genderRankMod;
-        }
-        try {
-            $score += random_int(0, self::$temperatureMod); // optional temperature could be used to randomly increase the rank of a player slightly -- default is: 0(min),0(max)
-        } catch (Exception $e) {
-            echo "playerScore | ".$e->getMessage().PHP_EOL;
-        }
-        return $score;
-    }
-
-    public function generateValidMatches(): array
-    {
-        if (!count($this->partners)) {
-            $playerPool = array_map(fn($p) => ['name' => $p['peg_name'], 'score' => $p['skill_score']], $this->playerData);
-            $teams = new ComboGenerator($playerPool, 2);
-            $this->partners = $teams->toArray();
-        }
-
-        $validMatches = [];
-
-        foreach ($this->partners as $team1) {
-            $team1_names = array_column($team1, 'name');
-
-            foreach ($this->partners as $team2) {
-
-                // Ensure no player is on both teams
-                $team2_names = array_column($team2, 'name');
-                if (array_intersect($team1_names, $team2_names)) {
-                    continue;
-                }
-
-                // this accounts for the score difference of 2 teams... e.g. 40 & 70 vs 60 & 60  or  40 & 100 vs 30 & 100,
-                // but we should also check for a greater score difference between partners too
-                if (abs($team1[0]['score'] - $team1[1]['score']) > self::$partnerDiffLimit ||
-                    abs($team2[0]['score'] - $team2[1]['score']) > self::$partnerDiffLimit) {
-                    continue;
-                }
-
-                $tScore1 = $team1[0]['score'] + $team1[1]['score'];
-                $tScore2 = $team2[0]['score'] + $team2[1]['score'];
-
-                if (abs($tScore1 - $tScore2) <= self::$teamDiffLimit) {
-
-                    $t1Hash = md5(print_r($team1_names,true));
-                    $t2Hash = md5(print_r($team2_names,true));
-
-                    $hashMash = [$t1Hash, $t2Hash];
-                    sort($hashMash);
-                    $hashMashStr = implode(":", $hashMash);
-
-                    $validMatches[$hashMashStr] = array_merge($team1_names, $team2_names);
-                }
-            }
-        }
-
-        // Return unique matches and give them a good shuffle whilst we're at it...
-        return $this->shuffleAssoc($validMatches);
     }
 
     public function scheduleRound(): array
@@ -342,26 +350,17 @@ class RoundRobin
         echo "Matches saved to $outputFile".PHP_EOL;
     }
 
-    public function shuffleAssoc($list)
+    public function playerScore(string $colour, string $gender): int
     {
-        if (!is_array($list)) {
-            return $list;
+        $score = self::$skillRanks[$colour] ?? 0;
+        if (strtolower($gender) === 'f') {
+            $score += self::$genderRankMod;
         }
-
-        $keys = [];
-        $origKeys = array_keys($list);
-        shuffle($origKeys);
-
-        foreach ($origKeys as $key) {
-            $keys[] = strrev($key);
+        try {
+            $score += random_int(0, self::$temperatureMod); // optional temperature could be used to randomly increase the rank of a player slightly -- default is: 0(min),0(max)
+        } catch (Exception $e) {
+            echo "playerScore | ".$e->getMessage().PHP_EOL;
         }
-        shuffle($keys);
-
-        $random = [];
-        foreach ($keys as $key) {
-            $key = strrev($key);
-            $random[$key] = $list[$key];
-        }
-        return $random;
+        return $score;
     }
 }
